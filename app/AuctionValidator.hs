@@ -47,13 +47,16 @@ import PlutusTx.Show qualified as PlutusTx
 data PubKey = PubKey PlutusTx.BuiltinByteString
 data Sig = Sig PlutusTx.BuiltinByteString
 -- List of data operators that must sign and minimum number of them that must sign
-data MultiSigPubKey = MultiSigPubKey [PubKey] Int
+data MultiSigPubKey = MultiSigPubKey [PubKey] Integer
 -- Datum that must be signed by each data operator
 data Challenge = Challenge PlutusTx.BuiltinByteString
 -- A single signature by a single data operator public key
 data SingleSig = SingleSig { key :: PubKey, sig :: Sig }
 -- Signatures produced by data operators for challenge
 data MultiSig = MultiSig [SingleSig]
+
+class MultiSigScheme where
+  sign :: ()
 
 -- Main parameters / initialization for client contract
 data ClientParams
@@ -64,12 +67,23 @@ data ClientParams
         , amount :: Lovelace          -- The amount that will be payed to the publisher by the offerer
         }
 
+PlutusTx.makeLift ''PubKey
+PlutusTx.makeLift ''MultiSigPubKey
+PlutusTx.makeLift ''Challenge
+PlutusTx.makeLift ''ClientParams
+
 -- Requests to contract, can claim bounty
 data ClientRedeemer
     = ClaimBounty
         { multiSig :: MultiSig    -- List of signatures of the challenge provided by data publishers
         , publisher :: PubKeyHash -- Will receive payment
         }
+
+PlutusTx.unstableMakeIsData ''PubKey
+PlutusTx.unstableMakeIsData ''Sig
+PlutusTx.unstableMakeIsData ''SingleSig
+PlutusTx.unstableMakeIsData ''MultiSig
+PlutusTx.unstableMakeIsData ''ClientRedeemer
 
     -- BLOCK1
 data AuctionParams = AuctionParams
