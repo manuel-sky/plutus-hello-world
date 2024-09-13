@@ -17,9 +17,9 @@
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:target-version=1.0.0 #-}
 
 {-
-Note that we imports `ScriptContext` from `PlutusLedgerApi.V2`, which means that 
+Note that we imports `ScriptContext` from `PlutusLedgerApi.V2`, which means that
 the script created from it will be a PlutusV2 script.
-PlutusV2 only supports Plutus Core v1.0.0 (currently the highest and default 
+PlutusV2 only supports Plutus Core v1.0.0 (currently the highest and default
 version is v1.1.0), which is why the `target-version=1.0.0` flag is needed.
 -}
 
@@ -29,7 +29,7 @@ import PlutusCore.Version (plcVersion100)
 import PlutusLedgerApi.V1 (Lovelace, POSIXTime, PubKeyHash, Value)
 import PlutusLedgerApi.V1.Address (pubKeyHashAddress)
 import PlutusLedgerApi.V1.Interval (contains)
-import PlutusLedgerApi.V1.Value (lovelaceValue)
+import PlutusLedgerApi.V1.Value (lovelaceValue, geq)
 import PlutusLedgerApi.V2 (
     Datum (..),
     OutputDatum (..),
@@ -44,7 +44,34 @@ import PlutusTx
 import PlutusTx.Prelude qualified as PlutusTx
 import PlutusTx.Show qualified as PlutusTx
 
--- BLOCK1
+data PubKey = PubKey PlutusTx.BuiltinByteString
+data Sig = Sig PlutusTx.BuiltinByteString
+-- List of data operators that must sign and minimum number of them that must sign
+data MultiSigPubKey = MultiSigPubKey [PubKey] Int
+-- Datum that must be signed by each data operator
+data Challenge = Challenge PlutusTx.BuiltinByteString
+-- A single signature by a single data operator public key
+data SingleSig = SingleSig { key :: PubKey, sig :: Sig }
+-- Signatures produced by data operators for challenge
+data MultiSig = MultiSig [SingleSig]
+
+-- Main parameters / initialization for client contract
+data ClientParams
+    = ClientParams
+        { offerer :: PubKeyHash       -- Will pay publisher for successfully claimed bounty
+        , operators :: MultiSigPubKey -- Public keys of data operators that must sign off the bounty
+        , challenge :: Challenge      -- The data that must be signed to claim the bounty
+        , amount :: Lovelace          -- The amount that will be payed to the publisher by the offerer
+        }
+
+-- Requests to contract, can claim bounty
+data ClientRedeemer
+    = ClaimBounty
+        { multiSig :: MultiSig    -- List of signatures of the challenge provided by data publishers
+        , publisher :: PubKeyHash -- Will receive payment
+        }
+
+    -- BLOCK1
 data AuctionParams = AuctionParams
     { apSeller :: PubKeyHash
     -- ^ Seller's wallet address. The highest bid (if exists) will be sent to the seller.
@@ -53,9 +80,9 @@ data AuctionParams = AuctionParams
     -- ^ The asset being auctioned. It can be a single token, multiple tokens of the same
     -- kind, or tokens of different kinds, and the token(s) can be fungible or non-fungible.
     -- These can all be encoded as a `Value`.
-    , apMinBid :: Lovelace
+--    , apMinBid :: Lovelace
     -- ^ The minimum bid in Lovelace.
-    , apEndTime :: POSIXTime
+--    , apEndTime :: POSIXTime
     -- ^ The deadline for placing a bid. This is the earliest time the auction can be closed.
     }
 
@@ -93,6 +120,28 @@ and pay out the seller and the highest bidder.
 data AuctionRedeemer = NewBid Bid | Payout
 
 PlutusTx.unstableMakeIsData ''AuctionRedeemer
+auctionTypedValidator ::
+    AuctionParams ->
+    AuctionDatum ->
+    AuctionRedeemer ->
+    ScriptContext ->
+    Bool
+auctionTypedValidator params (AuctionDatum highestBid) redeemer ctx@(ScriptContext txInfo _) =
+    let
+        info :: TxInfo
+        info = scriptContextTxInfo ctx
+    in
+      case PlutusTx.find
+           ( \o ->
+               txOutAddress o
+               PlutusTx.== pubKeyHashAddress (apSeller params)
+               PlutusTx.&& txOutValue o
+               PlutusTx.== apAsset params
+           )
+           (txInfoOutputs txInfo) of
+        Just _ -> True
+        Nothing -> PlutusTx.traceError ("Not found: Output paid to seller")
+
 
 -- BLOCK2
 
@@ -101,6 +150,7 @@ PlutusTx.unstableMakeIsData ''AuctionRedeemer
 {- | Given the auction parameters, determines whether the transaction is allowed to
 spend the UTXO.
 -}
+{-
 auctionTypedValidator ::
     AuctionParams ->
     AuctionDatum ->
@@ -214,7 +264,7 @@ auctionTypedValidator params (AuctionDatum highestBid) redeemer ctx@(ScriptConte
                 (txInfoOutputs txInfo) of
                 Just _ -> True
                 Nothing -> PlutusTx.traceError ("Not found: Output paid to highest bidder")
-
+-}
 -- BLOCK8
 {-# INLINEABLE auctionUntypedValidator #-}
 auctionUntypedValidator :: AuctionParams -> BuiltinData -> BuiltinData -> BuiltinData -> PlutusTx.BuiltinUnit
