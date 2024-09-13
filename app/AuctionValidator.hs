@@ -6,6 +6,7 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-full-laziness #-}
 {-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}
 {-# OPTIONS_GHC -fno-omit-interface-pragmas #-}
@@ -58,14 +59,20 @@ data MultiSig = MultiSig [SingleSig]
 class MultiSigScheme where
   sign :: ()
 
+class CP a where
+  foo :: a -> ()
+
 -- Main parameters / initialization for client contract
-data ClientParams
+data ClientParams a
     = ClientParams
         { offerer :: PubKeyHash       -- Will pay publisher for successfully claimed bounty
-        , operators :: MultiSigPubKey -- Public keys of data operators that must sign off the bounty
+        , operators :: a -- Public keys of data operators that must sign off the bounty
         , challenge :: Challenge      -- The data that must be signed to claim the bounty
         , amount :: Lovelace          -- The amount that will be payed to the publisher by the offerer
         }
+
+instance CP (ClientParams a) where
+  foo _ = ()
 
 PlutusTx.makeLift ''PubKey
 PlutusTx.makeLift ''MultiSigPubKey
