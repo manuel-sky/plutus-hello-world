@@ -108,9 +108,10 @@ clientTypedValidator params clientDatum redeemer ctx@(ScriptContext txInfo _) =
     conditions = case redeemer of
         ClaimBounty multiSig ->
             [
-              -- the signatures match the challenge
+              -- The signatures match the challenge
               multiSigValid (operators params) (challenge params) multiSig
-              -- the asset is transferred from the offerer to the publisher
+            , -- The asset has been transferred from the offerer to the publisher
+              assetTransferred txInfo (publisher params) (asset params)
             ]
 
 -- Function that checks if a SingleSig is valid for a given Challenge
@@ -147,6 +148,20 @@ pubKeyExists pk (x:xs) = pk == x || pubKeyExists pk xs
 allUniquePubKeys :: [PubKey] -> Bool
 allUniquePubKeys [] = True
 allUniquePubKeys (pk:pks) = not (pubKeyExists pk pks) && allUniquePubKeys pks
+
+-- Verify that asset has been transferred to the publisher
+assetTransferred :: TxInfo -> PubKeyHash -> Value -> Bool
+assetTransferred txInfo publisher asset =
+  case PlutusTx.find
+       ( \o ->
+           txOutAddress o
+           PlutusTx.== pubKeyHashAddress publisher
+           PlutusTx.&& txOutValue o
+           PlutusTx.== asset
+       )
+       (txInfoOutputs txInfo) of
+    Just _ -> True
+    Nothing -> PlutusTx.traceError ("Not found: Asset transferred to publisher")
 
     -- BLOCK1
 data AuctionParams = AuctionParams
