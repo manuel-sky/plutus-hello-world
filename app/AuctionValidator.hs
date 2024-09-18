@@ -104,7 +104,7 @@ clientTypedValidator params clientDatum redeemer ctx@(ScriptContext txInfo _) =
     conditions :: [Bool]
     conditions = case redeemer of
         ClaimBounty multiSig ->
-            [  correctNewDatum bid
+            [
             ]
 
     -- BLOCK1
