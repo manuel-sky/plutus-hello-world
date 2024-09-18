@@ -99,11 +99,13 @@ clientTypedValidator ::
     ScriptContext ->
     Bool
 clientTypedValidator params clientDatum redeemer ctx@(ScriptContext txInfo _) =
-    let
-        info :: TxInfo
-        info = scriptContextTxInfo ctx
-    in
-      True
+    PlutusTx.and conditions
+  where
+    conditions :: [Bool]
+    conditions = case redeemer of
+        ClaimBounty multiSig ->
+            [  correctNewDatum bid
+            ]
 
     -- BLOCK1
 data AuctionParams = AuctionParams
