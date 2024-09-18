@@ -72,7 +72,7 @@ data ClientParams
         , publisher :: PubKeyHash     -- Will receive payment
         , operators :: MultiSigPubKey -- Public keys of data operators that must sign off the bounty
         , challenge :: Challenge      -- The hash that must be signed to claim the bounty
-        , asset :: Value              -- The amount that will be payed to the publisher by the offerer
+        , asset :: Value              -- The amount asset will be transferred to the publisher by the offerer
         }
 
 PlutusTx.makeLift ''ClientParams
@@ -84,6 +84,26 @@ data ClientRedeemer
         }
 
 PlutusTx.unstableMakeIsData ''ClientRedeemer
+
+-- The datum is the state of the smart contract
+data ClientDatum
+  = Pending   -- The publisher hasn't claimed the bounty yet, contract is running
+  | Fulfilled -- The publisher has claimed the bounty, contract is finished
+
+PlutusTx.unstableMakeIsData ''ClientDatum
+
+clientTypedValidator ::
+    ClientParams ->
+    ClientDatum ->
+    ClientRedeemer ->
+    ScriptContext ->
+    Bool
+clientTypedValidator params clientDatum redeemer ctx@(ScriptContext txInfo _) =
+    let
+        info :: TxInfo
+        info = scriptContextTxInfo ctx
+    in
+      True
 
     -- BLOCK1
 data AuctionParams = AuctionParams
