@@ -105,6 +105,10 @@ clientTypedValidator params clientDatum redeemer ctx@(ScriptContext txInfo _) =
     conditions = case redeemer of
         ClaimBounty multiSig ->
             [
+              -- the current datum is Pending, meaning contract is active
+              -- the signatures match the challenge
+              -- the asset is transferred from the offerer to the publisher
+              -- the new datum is Fulfilled, meaning the contract is finished
             ]
 
     -- BLOCK1
