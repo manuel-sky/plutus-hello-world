@@ -43,10 +43,12 @@ import PlutusLedgerApi.V2.Contexts (getContinuingOutputs)
 import PlutusTx
 import PlutusTx.Prelude qualified as PlutusTx
 import PlutusTx.Show qualified as PlutusTx
-import qualified Data.Set as Set
-import PlutusTx.Builtins (verifySignature)
+import PlutusTx.Builtins (verifyEd25519Signature)
 
 data PubKey = PubKey PlutusTx.BuiltinByteString
+instance Eq PubKey where
+    (PubKey pk1) == (PubKey pk2) = pk1 == pk2
+
 data Sig = Sig PlutusTx.BuiltinByteString
 -- List of data operators that must sign and minimum number of them that must sign
 data MultiSigPubKey = MultiSigPubKey [PubKey] Integer
@@ -88,9 +90,8 @@ data ClientRedeemer
 PlutusTx.unstableMakeIsData ''ClientRedeemer
 
 -- The datum is the state of the smart contract
-data ClientDatum
-  = Pending   -- The publisher hasn't claimed the bounty yet, contract is running
-  | Fulfilled -- The publisher has claimed the bounty, contract is finished
+-- Just empty state for now, might later distinguish between running and claimed bounty
+data ClientDatum = ClientDatum
 
 PlutusTx.unstableMakeIsData ''ClientDatum
 
@@ -107,28 +108,45 @@ clientTypedValidator params clientDatum redeemer ctx@(ScriptContext txInfo _) =
     conditions = case redeemer of
         ClaimBounty multiSig ->
             [
-              -- the current datum is Pending, meaning contract is active
               -- the signatures match the challenge
+              multiSigValid (operators params) (challenge params) multiSig
               -- the asset is transferred from the offerer to the publisher
-              -- the new datum is Fulfilled, meaning the contract is finished
             ]
 
 -- Function that checks if a SingleSig is valid for a given Challenge
 singleSigValid :: Challenge -> SingleSig -> Bool
 singleSigValid (Challenge challengeBytes) (SingleSig (PubKey pubKey) (Sig sig)) =
-    verifySignature pubKey challengeBytes sig
+  verifyEd25519Signature pubKey challengeBytes sig
+
+-- Main function to check if the MultiSig satisfies at least N valid unique signatures
+multiSigValid :: MultiSigPubKey -> Challenge -> MultiSig -> Bool
+multiSigValid multiSigPubKey challenge multiSig =
+    atLeastNUniqueValidSigs multiSigPubKey challenge multiSig
 
 -- Function that ensures at least N unique valid signatures from allowed pubkeys
 atLeastNUniqueValidSigs :: MultiSigPubKey -> Challenge -> MultiSig -> Bool
 atLeastNUniqueValidSigs (MultiSigPubKey allowedPubKeys n) challenge (MultiSig sigs) =
     let validSigs = filter (\(SingleSig pubKey sig) -> pubKey `elem` allowedPubKeys && singleSigValid challenge (SingleSig pubKey sig)) sigs
-        uniquePubKeys = Set.fromList $ map (\(SingleSig pubKey _) -> pubKey) validSigs
-    in fromIntegral (Set.size uniquePubKeys) >= n
+        uniquePubKeys = collectUniquePubKeys validSigs []
+    in length uniquePubKeys >= fromIntegral n
 
--- Main function to check if the MultiSig satisfies at least N valid unique signatures
-signatureValid :: MultiSigPubKey -> Challenge -> MultiSig -> Bool
-signatureValid multiSigPubKey challenge multiSig =
-    atLeastNUniqueValidSigs multiSigPubKey challenge multiSig
+-- Helper function to collect unique PubKeys from valid signatures
+collectUniquePubKeys :: [SingleSig] -> [PubKey] -> [PubKey]
+collectUniquePubKeys [] acc = acc
+collectUniquePubKeys (SingleSig pubKey _:sigs) acc =
+    if pubKeyExists pubKey acc
+    then collectUniquePubKeys sigs acc
+    else collectUniquePubKeys sigs (pubKey:acc)
+
+-- Helper function to check if a PubKey is already in a list
+pubKeyExists :: PubKey -> [PubKey] -> Bool
+pubKeyExists pk [] = False
+pubKeyExists pk (x:xs) = pk == x || pubKeyExists pk xs
+
+-- Helper function to ensure all PubKeys in a list are unique
+allUniquePubKeys :: [PubKey] -> Bool
+allUniquePubKeys [] = True
+allUniquePubKeys (pk:pks) = not (pubKeyExists pk pks) && allUniquePubKeys pks
 
     -- BLOCK1
 data AuctionParams = AuctionParams
