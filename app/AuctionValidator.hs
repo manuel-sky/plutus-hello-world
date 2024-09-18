@@ -43,6 +43,8 @@ import PlutusLedgerApi.V2.Contexts (getContinuingOutputs)
 import PlutusTx
 import PlutusTx.Prelude qualified as PlutusTx
 import PlutusTx.Show qualified as PlutusTx
+import qualified Data.Set as Set
+import PlutusTx.Builtins (verifySignature)
 
 data PubKey = PubKey PlutusTx.BuiltinByteString
 data Sig = Sig PlutusTx.BuiltinByteString
@@ -110,6 +112,23 @@ clientTypedValidator params clientDatum redeemer ctx@(ScriptContext txInfo _) =
               -- the asset is transferred from the offerer to the publisher
               -- the new datum is Fulfilled, meaning the contract is finished
             ]
+
+-- Function that checks if a SingleSig is valid for a given Challenge
+singleSigValid :: Challenge -> SingleSig -> Bool
+singleSigValid (Challenge challengeBytes) (SingleSig (PubKey pubKey) (Sig sig)) =
+    verifySignature pubKey challengeBytes sig
+
+-- Function that ensures at least N unique valid signatures from allowed pubkeys
+atLeastNUniqueValidSigs :: MultiSigPubKey -> Challenge -> MultiSig -> Bool
+atLeastNUniqueValidSigs (MultiSigPubKey allowedPubKeys n) challenge (MultiSig sigs) =
+    let validSigs = filter (\(SingleSig pubKey sig) -> pubKey `elem` allowedPubKeys && singleSigValid challenge (SingleSig pubKey sig)) sigs
+        uniquePubKeys = Set.fromList $ map (\(SingleSig pubKey _) -> pubKey) validSigs
+    in fromIntegral (Set.size uniquePubKeys) >= n
+
+-- Main function to check if the MultiSig satisfies at least N valid unique signatures
+signatureValid :: MultiSigPubKey -> Challenge -> MultiSig -> Bool
+signatureValid multiSigPubKey challenge multiSig =
+    atLeastNUniqueValidSigs multiSigPubKey challenge multiSig
 
     -- BLOCK1
 data AuctionParams = AuctionParams
