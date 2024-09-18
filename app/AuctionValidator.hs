@@ -114,9 +114,9 @@ data AuctionParams = AuctionParams
     -- ^ The asset being auctioned. It can be a single token, multiple tokens of the same
     -- kind, or tokens of different kinds, and the token(s) can be fungible or non-fungible.
     -- These can all be encoded as a `Value`.
---    , apMinBid :: Lovelace
+    , apMinBid :: Lovelace
     -- ^ The minimum bid in Lovelace.
---    , apEndTime :: POSIXTime
+    , apEndTime :: POSIXTime
     -- ^ The deadline for placing a bid. This is the earliest time the auction can be closed.
     }
 
@@ -154,28 +154,6 @@ and pay out the seller and the highest bidder.
 data AuctionRedeemer = NewBid Bid | Payout
 
 PlutusTx.unstableMakeIsData ''AuctionRedeemer
-auctionTypedValidator ::
-    AuctionParams ->
-    AuctionDatum ->
-    AuctionRedeemer ->
-    ScriptContext ->
-    Bool
-auctionTypedValidator params (AuctionDatum highestBid) redeemer ctx@(ScriptContext txInfo _) =
-    let
-        info :: TxInfo
-        info = scriptContextTxInfo ctx
-    in
-      case PlutusTx.find
-           ( \o ->
-               txOutAddress o
-               PlutusTx.== pubKeyHashAddress (apSeller params)
-               PlutusTx.&& txOutValue o
-               PlutusTx.== apAsset params
-           )
-           (txInfoOutputs txInfo) of
-        Just _ -> True
-        Nothing -> PlutusTx.traceError ("Not found: Output paid to seller")
-
 
 -- BLOCK2
 
@@ -184,7 +162,6 @@ auctionTypedValidator params (AuctionDatum highestBid) redeemer ctx@(ScriptConte
 {- | Given the auction parameters, determines whether the transaction is allowed to
 spend the UTXO.
 -}
-{-
 auctionTypedValidator ::
     AuctionParams ->
     AuctionDatum ->
@@ -298,7 +275,7 @@ auctionTypedValidator params (AuctionDatum highestBid) redeemer ctx@(ScriptConte
                 (txInfoOutputs txInfo) of
                 Just _ -> True
                 Nothing -> PlutusTx.traceError ("Not found: Output paid to highest bidder")
--}
+
 -- BLOCK8
 {-# INLINEABLE auctionUntypedValidator #-}
 auctionUntypedValidator :: AuctionParams -> BuiltinData -> BuiltinData -> BuiltinData -> PlutusTx.BuiltinUnit
