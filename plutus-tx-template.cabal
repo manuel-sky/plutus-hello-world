@@ -24,4 +24,4 @@ executable plutus-tx-template
     , text
     , time
 
-  other-modules:    AuctionValidator
+  other-modules:    ClientValidator
