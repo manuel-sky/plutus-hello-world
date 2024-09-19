@@ -21,8 +21,9 @@ executable plutus-tx-template
     , plutus-ledger-api ^>=1.34.0.0
     , plutus-tx ^>=1.34.0.0
     , plutus-tx-plugin ^>=1.34.0.0
+    , plutus-apps
     , text
     , time
     , hex-text ^>=0.1.0.9
 
-  other-modules:    ClientValidator
+  other-modules:    ClientValidator, ClientTest
