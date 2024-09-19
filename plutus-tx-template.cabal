@@ -23,5 +23,6 @@ executable plutus-tx-template
     , plutus-tx-plugin ^>=1.34.0.0
     , text
     , time
+    , hex-text ^>=0.1.0.9
 
   other-modules:    ClientValidator
